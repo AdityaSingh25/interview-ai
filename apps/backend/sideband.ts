@@ -44,7 +44,7 @@ export async function initSideband(callId: string, interviewId: string) {
       parsedMessage.type ==
       "conversation.item.input_audio_transcription.completed"
     ) {
-      console.log("User : " + parsedMessage.transcript);
+      //console.log("User : " + parsedMessage.transcript);
       await prisma.message.create({
         data: {
           message: parsedMessage.transcript,
@@ -54,7 +54,7 @@ export async function initSideband(callId: string, interviewId: string) {
       });
     }
     if (parsedMessage.type == "response.output_audio_transcript.done") {
-      console.log("Ai : " + parsedMessage.transcript);
+      //console.log("Ai : " + parsedMessage.transcript);
       await prisma.message.create({
         data: {
           message: parsedMessage.transcript,
