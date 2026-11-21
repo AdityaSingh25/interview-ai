@@ -9,13 +9,6 @@ export default function Interview() {
 
   useEffect(() => {
     (async () => {
-      // Get a session token for OpenAI Realtime API
-      const tokenResponse = await axios.get(
-        `${Backend_url}/api/v1/get-ephemeral-token`,
-      );
-      const data = await tokenResponse.data;
-      const EPHEMERAL_KEY = data.value;
-
       // Create a peer connection
       const pc = new RTCPeerConnection();
 
@@ -35,12 +28,11 @@ export default function Interview() {
       await pc.setLocalDescription(offer);
 
       const sdpResponse = await fetch(
-        "https://api.openai.com/v1/realtime/calls",
+        `${Backend_url}/api/v1/session/${interviewId}`,
         {
           method: "POST",
           body: offer.sdp,
           headers: {
-            Authorization: `Bearer ${EPHEMERAL_KEY}`,
             "Content-Type": "application/sdp",
           },
         },
