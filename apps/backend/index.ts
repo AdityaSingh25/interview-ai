@@ -3,8 +3,7 @@ import { preInterviewBody } from "./types";
 import axios from "axios";
 import cors from "cors";
 import { prisma } from "./db";
-import { GoogleGenAI, Modality } from "@google/genai";
-import { log } from "node:console";
+import { initSideband } from "./sideband";
 
 const app = express();
 
@@ -12,14 +11,18 @@ app.use(express.json());
 
 app.use(cors());
 
+// Parse raw SDP payloads posted from the browser
+app.use(express.text({ type: ["application/sdp", "text/plain"] }));
+
 const sessionConfig = JSON.stringify({
-  session: {
-    type: "realtime",
-    model: "gpt-realtime-2.1",
-    audio: {
-      output: {
-        voice: "marin",
-      },
+  type: "realtime",
+  model: "gpt-realtime-2.1-mini",
+  audio: {
+    output: { voice: "marin" },
+    input: {
+      transcription: { model: "gpt-4o-mini-transcribe", language: "en" }, // or "gpt-4o-mini-transcribe" (cheaper), "whisper-1"
+      noise_reduction: { type: "near_field" }, // laptop/headset mic
+      turn_detection: { type: "semantic_vad" },
     },
   },
 });
@@ -93,28 +96,47 @@ app.post("/api/v1/pre-interview", async (req, res) => {
 //   }
 // });
 
-app.get("/api/v1/get-ephemeral-token", async (req, res) => {
-  log("token hit");
-  res.set("Cache-Control", "no-store");
+// An endpoint which creates a Realtime API session.
+
+app.post("/api/v1/session/:interviewId", async (req, res) => {
+  const fd = new FormData();
+  fd.set("sdp", req.body);
+  fd.set("session", sessionConfig);
+
   try {
-    const response = await fetch(
-      "https://api.openai.com/v1/realtime/client_secrets",
+    const sdpResponse = await fetch(
+      "https://api.openai.com/v1/realtime/calls",
       {
         method: "POST",
         headers: {
           Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-          "Content-Type": "application/json",
           "OpenAI-Safety-Identifier": "hashed-user-id",
         },
-        body: sessionConfig,
+        body: fd,
       },
     );
 
-    const data = await response.json();
-    res.status(response.status).json(data);
+    // Send back the SDP we received from the OpenAI REST API
+    const sdp = await sdpResponse.text();
+    res.set(
+      "Content-Type",
+      sdpResponse.ok
+        ? "application/sdp"
+        : (sdpResponse.headers.get("Content-Type") ?? "text/plain"),
+    );
+
+    const location = sdpResponse.headers.get("Location");
+    if (location) res.set("Location", location);
+
+    const callId = location?.split("/").pop();
+
+    res.status(sdpResponse.status).send(sdp);
+    if (sdpResponse.status) {
+      initSideband(callId as string, req.params.interviewId);
+    }
   } catch (error) {
-    console.error("Token generation error:", error);
-    res.status(500).json({ error: "Failed to generate token" });
+    console.error("Session creation error:", error);
+    res.status(500).json({ error: "Failed to create session" });
   }
 });
 

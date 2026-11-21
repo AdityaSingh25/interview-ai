@@ -32,6 +32,7 @@ model Message {
   type          Messageype
   interviewId   String
   interview     Interview           @relation(fields: [interviewId], references: [id])
+  createdAt     DateTime            @default(now())
 }
 
 enum Messageype{
