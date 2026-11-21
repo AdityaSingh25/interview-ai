@@ -10,11 +10,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { App } from "./App";
 
 const elem = document.getElementById("root")!;
-const app = (
-  <StrictMode>
-    <App />
-  </StrictMode>
-);
+const app = <App />;
 
 // https://bun.com/docs/bundler/hot-reloading#import-meta-hot-data
 type HotData = { root?: Root };
