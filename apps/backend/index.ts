@@ -48,8 +48,9 @@ app.post("/api/v1/pre-interview", async (req, res) => {
   });
 });
 
+// by default it will read : GEMINI_API_KEY from the .env
 app.get("/get-ephemeral-token", async (req, res) => {
-  const client = new GoogleGenAI({ httpOptions: { apiVersion: "v1beta" } });
+  const client = new GoogleGenAI({ httpOptions: { apiVersion: "v1alpha" } });
   const expireTime = new Date(Date.now() + 30 * 60 * 1000).toISOString();
 
   try {
@@ -69,13 +70,11 @@ app.get("/get-ephemeral-token", async (req, res) => {
         }, // Default 1 minute in the future
       },
     });
-
-    console.log(JSON.stringify(token, null, 2));
     return res.json({
       token: token,
     });
   } catch (e) {
-    console.log("token error : " + e);
+    console.log("token error :", e);
     res.status(500).json({ message: "failed to create token" });
   }
 });
