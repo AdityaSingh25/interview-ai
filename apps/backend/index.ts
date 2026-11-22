@@ -161,56 +161,65 @@ app.post("/api/v1/session/:interviewId", async (req, res) => {
   }
 });
 
-app.get("/api/v1/result/:interviewId", async (req, res) => {
-  prisma.interview
-    .findFirst({
-      where: {
-        id: req.params.interviewId,
-      },
-      include: {
-        conversations: true,
-      },
-    })
-    .then(async (interview) => {
-      if (!interview) {
-        return res.status(404).json({
-          message: "Interview not found!",
-        });
-      }
+// Interviews whose evaluation is running right now. Pollers hit /result every few
+// seconds; this makes sure only the first one starts a Gemini call.
+// In-memory is fine for a single server process.
+const evaluating = new Set<string>();
 
-      res.json({
-        transcript: interview?.conversations.map((conversation) => ({
-          type: conversation.type,
-          content: conversation.message,
-          createdAt: conversation.createdAt,
-        })),
-        score: interview?.score,
-        result: interview?.feedback,
-        status: interview?.status,
-      });
-
-      if (interview.status != "Done") {
-        // making a gemini call here
-        const interviewResult = await calculateScore(interview.conversations);
-
-        await prisma.interview.update({
-          where: {
-            id: req.params.interviewId,
-          },
-          data: {
-            status: "Done",
-            feedback: interviewResult.feedback,
-            result: interviewResult.score,
-          },
-        });
-      }
-    })
-    .catch((error) => {
-      console.error(error);
-      res.status(500).json({
-        error: "Internal server error : " + error,
-      });
+async function evaluateInterview(interviewId: string) {
+  if (evaluating.has(interviewId)) return;
+  evaluating.add(interviewId);
+  try {
+    const messages = await prisma.message.findMany({
+      where: { interviewId },
+      orderBy: { createdAt: "asc" },
     });
+    const { score, feedback } = await calculateScore(messages);
+    await prisma.interview.update({
+      where: { id: interviewId },
+      data: { status: "Done", score, feedback },
+    });
+  } catch (error) {
+    // Leave the status as is, so the next poll retries.
+    console.error(`Evaluation failed for interview ${interviewId}:`, error);
+  } finally {
+    evaluating.delete(interviewId);
+  }
+}
+
+app.get("/api/v1/result/:interviewId", async (req, res) => {
+  const interviewId = req.params.interviewId;
+  try {
+    const interview = await prisma.interview.findFirst({
+      where: { id: interviewId },
+      include: { conversations: { orderBy: { createdAt: "asc" } } },
+    });
+
+    if (!interview) {
+      return res.status(404).json({ message: "Interview not found!" });
+    }
+
+    // The frontend opens the results page when the call ends, so an
+    // InProgress interview being polled here means it's ready to score.
+    // Runs in the background; the page keeps polling until status is Done.
+    if (interview.status === "InProgress") {
+      void evaluateInterview(interviewId);
+    }
+
+    return res.json({
+      transcript: interview.conversations.map((conversation) => ({
+        type: conversation.type,
+        content: conversation.message,
+        createdAt: conversation.createdAt,
+      })),
+      score: interview.score,
+      feedback: interview.feedback,
+      status: interview.status,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 app.listen(3001);

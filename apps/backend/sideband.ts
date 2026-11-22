@@ -40,6 +40,14 @@ export async function initSideband(callId: string, interviewId: string) {
   ws.on("message", async function incoming(message) {
     const parsedMessage = JSON.parse(message.toString());
 
+    // Noise or a cut-off turn can produce an empty transcript; don't save those.
+    if (
+      typeof parsedMessage.transcript === "string" &&
+      !parsedMessage.transcript.trim()
+    ) {
+      return;
+    }
+
     if (
       parsedMessage.type ==
       "conversation.item.input_audio_transcription.completed"

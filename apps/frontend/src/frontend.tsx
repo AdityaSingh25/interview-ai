@@ -9,6 +9,13 @@ import { StrictMode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { App } from "./App";
 
+// Follow the OS light/dark setting (globals.css defines the `.dark` palette).
+const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
+const applyTheme = () =>
+  document.documentElement.classList.toggle("dark", darkQuery.matches);
+applyTheme();
+darkQuery.addEventListener("change", applyTheme);
+
 const elem = document.getElementById("root")!;
 const app = <App />;
 
