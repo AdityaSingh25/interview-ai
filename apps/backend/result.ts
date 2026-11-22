@@ -58,6 +58,7 @@ export async function calculateScore(
   // happens, fall through to the next model instead of failing the evaluation.
   for (const model of MODELS) {
     try {
+      console.log("trying model : " + model);
       const response = await ai.models.generateContent({
         model,
         contents: `${RESULT_PROMPT}\n\n## Transcript\n${transcript}`,
