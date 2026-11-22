@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import { z } from "zod";
 
 const outputSchema = z.object({
@@ -64,6 +64,9 @@ export async function calculateScore(
         config: {
           responseMimeType: "application/json",
           responseJsonSchema: z.toJSONSchema(outputSchema), // JSON Schema from Zod
+          // Scoring a short transcript doesn't need deep reasoning; default
+          // thinking made each call take 40s+ and time out on Railway.
+          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
           // An overloaded model can hang instead of erroring; give up and try the next one.
           abortSignal: AbortSignal.timeout(MODEL_TIMEOUT_MS),
         },
@@ -86,6 +89,12 @@ export async function calculateScore(
 }
 
 // Tried in order. All are listed for this API key (checked with ai.models.list()).
-const MODELS = ["gemini-3.5-flash", "gemini-3.8-flash", "gemini-3.7-flash"];
+// Lite first: much faster (~7s vs 40s+) and plenty for scoring a transcript.
+const MODELS = [
+  "gemini-3.5-flash-lite",
+  "gemini-3.5-flash",
+  "gemini-3.8-flash",
+  "gemini-3.7-flash",
+];
 const RETRYABLE_STATUS = new Set([429, 500, 503]);
-const MODEL_TIMEOUT_MS = 40_000;
+const MODEL_TIMEOUT_MS = 60_000;
