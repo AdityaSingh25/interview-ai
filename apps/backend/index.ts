@@ -4,6 +4,7 @@ import axios from "axios";
 import cors from "cors";
 import { prisma } from "./db";
 import { initSideband } from "./sideband";
+import { calculateScore } from "./result";
 
 const app = express();
 
@@ -103,6 +104,18 @@ app.post("/api/v1/session/:interviewId", async (req, res) => {
   fd.set("sdp", req.body);
   fd.set("session", sessionConfig);
 
+  const result = await prisma.interview.updateMany({
+    where: { id: req.params.interviewId, status: "Pre" },
+    data: {
+      status: "InProgress",
+    },
+  });
+  if (result.count == 0) {
+    return res.status(409).json({
+      message: "interview not found or already started",
+    });
+  }
+
   try {
     const sdpResponse = await fetch(
       "https://api.openai.com/v1/realtime/calls",
@@ -116,6 +129,14 @@ app.post("/api/v1/session/:interviewId", async (req, res) => {
       },
     );
 
+    if (!sdpResponse.ok) {
+      await prisma.interview.updateMany({
+        where: { id: req.params.interviewId, status: "InProgress" },
+        data: {
+          status: "Pre",
+        },
+      });
+    }
     // Send back the SDP we received from the OpenAI REST API
     const sdp = await sdpResponse.text();
     res.set(
@@ -131,13 +152,65 @@ app.post("/api/v1/session/:interviewId", async (req, res) => {
     const callId = location?.split("/").pop();
 
     res.status(sdpResponse.status).send(sdp);
-    if (sdpResponse.status) {
+    if (sdpResponse.ok && callId) {
       initSideband(callId as string, req.params.interviewId);
     }
   } catch (error) {
     console.error("Session creation error:", error);
     res.status(500).json({ error: "Failed to create session" });
   }
+});
+
+app.get("/api/v1/result/:interviewId", async (req, res) => {
+  prisma.interview
+    .findFirst({
+      where: {
+        id: req.params.interviewId,
+      },
+      include: {
+        conversations: true,
+      },
+    })
+    .then(async (interview) => {
+      if (!interview) {
+        return res.status(404).json({
+          message: "Interview not found!",
+        });
+      }
+
+      res.json({
+        transcript: interview?.conversations.map((conversation) => ({
+          type: conversation.type,
+          content: conversation.message,
+          createdAt: conversation.createdAt,
+        })),
+        score: interview?.score,
+        result: interview?.feedback,
+        status: interview?.status,
+      });
+
+      if (interview.status != "Done") {
+        // making a gemini call here
+        const interviewResult = await calculateScore(interview.conversations);
+
+        await prisma.interview.update({
+          where: {
+            id: req.params.interviewId,
+          },
+          data: {
+            status: "Done",
+            feedback: interviewResult.feedback,
+            result: interviewResult.score,
+          },
+        });
+      }
+    })
+    .catch((error) => {
+      console.error(error);
+      res.status(500).json({
+        error: "Internal server error : " + error,
+      });
+    });
 });
 
 app.listen(3001);
