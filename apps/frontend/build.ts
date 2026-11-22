@@ -14,6 +14,8 @@ const result = await Bun.build({
   minify: true,
   target: "browser",
   sourcemap: "linked",
+  // Inline BUN_PUBLIC_* env vars (e.g. BUN_PUBLIC_BACKEND_URL) into the bundle.
+  env: "BUN_PUBLIC_*",
   define: {
     "process.env.NODE_ENV": JSON.stringify("production"),
   },

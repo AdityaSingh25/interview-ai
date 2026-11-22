@@ -10,7 +10,12 @@ const app = express();
 
 app.use(express.json());
 
-app.use(cors());
+// FRONTEND_URL: comma-separated list of allowed origins in production
+// (e.g. https://your-frontend.up.railway.app). Unset = allow any origin (local dev).
+const allowedOrigins = process.env.FRONTEND_URL?.split(",")
+  .map((origin) => origin.trim().replace(/\/$/, ""))
+  .filter(Boolean);
+app.use(cors(allowedOrigins?.length ? { origin: allowedOrigins } : undefined));
 
 // Parse raw SDP payloads posted from the browser
 app.use(express.text({ type: ["application/sdp", "text/plain"] }));
@@ -222,4 +227,6 @@ app.get("/api/v1/result/:interviewId", async (req, res) => {
   }
 });
 
-app.listen(3001);
+// Hosts like Railway/Render assign the port through the PORT env var.
+const port = Number(process.env.PORT) || 3001;
+app.listen(port, () => console.log(`Backend listening on port ${port}`));
