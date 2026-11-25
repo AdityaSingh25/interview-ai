@@ -25,6 +25,7 @@ model Interview{
   score         Int                 @default(0)
   conversations Message[]
   feedback      String?
+  resumeData    String?
 }
 
 model Message {

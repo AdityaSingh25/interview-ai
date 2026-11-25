@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useState, type SyntheticEvent } from "react";
 import { toast } from "sonner";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
@@ -9,8 +9,10 @@ import { Backend_url } from "@/lib/config";
 function toGithubProfileUrl(input: string): string | null {
   const value = input.trim();
   const username =
-    value.match(/^(?:https?:\/\/)?(?:www\.)?github\.com\/([A-Za-z0-9-]{1,39})\/?$/i)?.[1] ??
-    value.match(/^[A-Za-z0-9-]{1,39}$/)?.[0];
+    value.match(
+      /^(?:https?:\/\/)?(?:www\.)?github\.com\/([A-Za-z0-9-]{1,39})\/?$/i,
+    )?.[1] ?? value.match(/^[A-Za-z0-9-]{1,39}$/)?.[0];
+  console.log("***  " + username);
   return username ? `https://github.com/${username}` : null;
 }
 
@@ -18,8 +20,10 @@ export default function Form() {
   const [githubUrl, setGithubUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const [isFileUploaded, setIsFileUploaded] = useState<boolean>(false);
+  const [file, setFile] = useState<File | null>(null);
 
-  async function onSubmit(e: FormEvent) {
+  async function onSubmit(e: SyntheticEvent) {
     e.preventDefault();
     const profileUrl = toGithubProfileUrl(githubUrl);
     if (!profileUrl) {
@@ -28,14 +32,30 @@ export default function Form() {
     }
 
     setLoading(true);
+    const formData = new FormData();
+    formData.append("githubUrl", profileUrl);
+    formData.append("resume", file!);
+
     try {
-      const response = await axios.post(`${Backend_url}/api/v1/pre-interview`, {
-        githubUrl: profileUrl,
-      });
+      const response = await axios.post(
+        `${Backend_url}/api/v1/pre-interview`,
+        formData,
+      );
       navigate(`/interview/${response.data.id}`);
     } catch {
-      toast.error("Couldn't set up the interview. Check the GitHub link and try again.");
+      toast.error(
+        "Couldn't set up the interview. Check the GitHub link and try again.",
+      );
       setLoading(false);
+    }
+  }
+
+  function onResumeChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.currentTarget.files;
+    if (files) {
+      setFile(files[0]!);
+      setIsFileUploaded(true);
+      console.log(files[0]);
     }
   }
 
@@ -55,8 +75,11 @@ export default function Form() {
           about your work.
         </p>
 
-        <form onSubmit={onSubmit} className="mt-8 flex flex-col gap-2 sm:flex-row">
-          <label className="relative flex-1">
+        <form
+          onSubmit={onSubmit}
+          className="mt-8 flex flex-col gap-2 sm:flex-row"
+        >
+          <label className="relative flex">
             <span className="sr-only">GitHub profile URL</span>
             <FolderGit2 className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
             <input
@@ -67,10 +90,19 @@ export default function Form() {
               spellCheck={false}
               placeholder="github.com/your-name"
               value={githubUrl}
-              onChange={(e) => setGithubUrl(e.target.value)}
+              onChange={(e) => {
+                console.log(githubUrl);
+                setGithubUrl(e.target.value);
+              }}
               className="h-11 w-full rounded-lg border border-input bg-background pr-3 pl-9 text-sm shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
             />
           </label>
+          <input
+            type="file"
+            id="resume"
+            accept=".pdf, .docx, .doc, .odt"
+            onChange={onResumeChange}
+          ></input>
           <button
             type="submit"
             disabled={loading}
@@ -90,6 +122,14 @@ export default function Form() {
           </button>
         </form>
 
+        <br />
+
+        {isFileUploaded && (
+          <div className="flex flex-col gap-y-1 w-full">
+            <p className="text-center text-blue-800 text-sm">File selected</p>
+            <div className="h-1.5 w-full bg-green-500 rounded-full"></div>
+          </div>
+        )}
         <p className="mt-4 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
           <Headphones className="size-3.5" />
           You'll need a microphone. Headphones work best.

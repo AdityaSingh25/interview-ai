@@ -5,10 +5,19 @@ import cors from "cors";
 import { prisma } from "./db";
 import { initSideband } from "./sideband";
 import { calculateScore } from "./result";
+import multer from "multer";
+import { extractText, getDocumentProxy } from "unpdf";
 
 const app = express();
 
 app.use(express.json());
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024,
+  },
+});
 
 // FRONTEND_URL: comma-separated list of allowed origins in production
 // (e.g. https://your-frontend.up.railway.app). Unset = allow any origin (local dev).
@@ -33,7 +42,13 @@ const sessionConfig = JSON.stringify({
   },
 });
 
-app.post("/api/v1/pre-interview", async (req, res) => {
+async function pdfToText(buffer: Buffer): Promise<String> {
+  const pdf = await getDocumentProxy(new Uint8Array(buffer));
+  const { text } = await extractText(pdf, { mergePages: true });
+  return text;
+}
+
+app.post("/api/v1/pre-interview", upload.single("resume"), async (req, res) => {
   const { success, data } = preInterviewBody.safeParse(req.body);
   if (!success) {
     res.status(411).json({
@@ -41,6 +56,9 @@ app.post("/api/v1/pre-interview", async (req, res) => {
     });
     return;
   }
+
+  const buffer = req.file?.buffer;
+  const resumeContent = await pdfToText(buffer!);
 
   const githubUrl = data?.githubUrl.endsWith("/")
     ? data?.githubUrl.slice(0, -1)
@@ -63,6 +81,7 @@ app.post("/api/v1/pre-interview", async (req, res) => {
     data: {
       githubMetada: JSON.stringify(filteredUserRepo),
       status: "Pre",
+      resumeData: resumeContent as string,
     },
   });
 
@@ -227,6 +246,9 @@ app.get("/api/v1/result/:interviewId", async (req, res) => {
   }
 });
 
+app.post("api/v1/resume", async (req, res) => {
+  res.download("./file.pdf");
+});
 // Hosts like Railway/Render assign the port through the PORT env var.
 const port = Number(process.env.PORT) || 3001;
 app.listen(port, () => console.log(`Backend listening on port ${port}`));
