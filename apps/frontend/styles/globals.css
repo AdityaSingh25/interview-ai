@@ -4,6 +4,7 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  --font-sans: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
   --color-background: var(--background);
   --color-ai: var(--ai);
   --color-user: var(--user);
@@ -44,76 +45,78 @@
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-  --ai: oklch(0.55 0.2 277);
-  --user: oklch(0.6 0.14 162);
+  --radius: 0.75rem;
+  /* Dante palette, light: vellum page, lapis ink, gilt = interviewer, verdigris = you */
+  --background: #eef1f8;
+  --foreground: #141b3b;
+  --card: #f8f9fd;
+  --card-foreground: #141b3b;
+  --popover: #f8f9fd;
+  --popover-foreground: #141b3b;
+  --primary: #141b3b;
+  --primary-foreground: #eef0f8;
+  --secondary: #e2e6f2;
+  --secondary-foreground: #141b3b;
+  --muted: #e2e6f2;
+  --muted-foreground: #565f8c;
+  --accent: #dde2f1;
+  --accent-foreground: #141b3b;
+  --destructive: #c4463a;
+  --border: rgb(20 27 59 / 0.12);
+  --input: rgb(20 27 59 / 0.16);
+  --ring: #a9740e;
+  --chart-1: #a9740e;
+  --chart-2: #1c8770;
+  --chart-3: #141b3b;
+  --chart-4: #565f8c;
+  --chart-5: #c4463a;
+  --sidebar: #f8f9fd;
+  --sidebar-foreground: #141b3b;
+  --sidebar-primary: #141b3b;
+  --sidebar-primary-foreground: #eef0f8;
+  --sidebar-accent: #e2e6f2;
+  --sidebar-accent-foreground: #141b3b;
+  --sidebar-border: rgb(20 27 59 / 0.12);
+  --sidebar-ring: #a9740e;
+  --ai: #a9740e;
+  --user: #1c8770;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
-  --ai: oklch(0.7 0.16 277);
-  --user: oklch(0.74 0.14 162);
+  /* Dante palette, dark: lapis night, vellum text */
+  --background: #141b3b;
+  --foreground: #eef0f8;
+  --card: #1a2249;
+  --card-foreground: #eef0f8;
+  --popover: #1a2249;
+  --popover-foreground: #eef0f8;
+  --primary: #e8b04b;
+  --primary-foreground: #141b3b;
+  --secondary: #222b57;
+  --secondary-foreground: #eef0f8;
+  --muted: #222b57;
+  --muted-foreground: #9aa3c7;
+  --accent: #263063;
+  --accent-foreground: #eef0f8;
+  --destructive: #f0776b;
+  --border: rgb(238 240 248 / 0.12);
+  --input: rgb(238 240 248 / 0.16);
+  --ring: #e8b04b;
+  --chart-1: #e8b04b;
+  --chart-2: #5cc8b0;
+  --chart-3: #eef0f8;
+  --chart-4: #9aa3c7;
+  --chart-5: #f0776b;
+  --sidebar: #1a2249;
+  --sidebar-foreground: #eef0f8;
+  --sidebar-primary: #e8b04b;
+  --sidebar-primary-foreground: #141b3b;
+  --sidebar-accent: #222b57;
+  --sidebar-accent-foreground: #eef0f8;
+  --sidebar-border: rgb(238 240 248 / 0.12);
+  --sidebar-ring: #e8b04b;
+  --ai: #e8b04b;
+  --user: #5cc8b0;
 }
 
 @layer base {
@@ -122,5 +125,74 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/* ---------- Dante motion ---------- */
+
+/* Page-load: rings draw outward from the centre (one orchestrated moment). */
+@keyframes ring-draw {
+  from { stroke-dashoffset: 1; opacity: 0; }
+  to { stroke-dashoffset: 0; opacity: var(--ring-opacity, 1); }
+}
+
+/* Idle: a slow brightness wave travels outward through the rings. */
+@keyframes ring-breathe {
+  0%, 100% { opacity: var(--ring-opacity, 1); }
+  50% { opacity: calc(var(--ring-opacity, 1) * 0.35); }
+}
+
+/* Speaking: a quicker pulse rolls outward. */
+@keyframes ring-wave {
+  0% { opacity: calc(var(--ring-opacity, 1) * 0.4); }
+  30% { opacity: 1; }
+  100% { opacity: calc(var(--ring-opacity, 1) * 0.4); }
+}
+
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes dial-sweep {
+  from { stroke-dashoffset: 1; }
+}
+
+.ring {
+  opacity: var(--ring-opacity, 1);
+  stroke-dasharray: 1;
+}
+.ring-intro .ring {
+  animation:
+    ring-draw 900ms cubic-bezier(0.22, 1, 0.36, 1) both,
+    ring-breathe 7s ease-in-out infinite;
+  animation-delay:
+    calc(var(--i) * 70ms),
+    calc(900ms + var(--i) * 260ms);
+}
+.ring-idle .ring {
+  animation: ring-breathe 7s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 260ms);
+}
+.ring-speaking .ring {
+  animation: ring-wave 1.4s ease-out infinite;
+  animation-delay: calc(var(--i) * 90ms);
+}
+
+.rise-in {
+  animation: rise-in 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--delay, 0ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ring-intro .ring,
+  .ring-idle .ring,
+  .ring-speaking .ring,
+  .rise-in {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+  .level-scale {
+    transform: none !important;
   }
 }

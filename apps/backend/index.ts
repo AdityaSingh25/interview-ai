@@ -15,7 +15,7 @@ app.use(express.json());
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 5 * 1024 * 1024,
+    fileSize: 5 * 1024 * 1024, // keep in sync with MAX_RESUME_MB
   },
 });
 
@@ -42,52 +42,118 @@ const sessionConfig = JSON.stringify({
   },
 });
 
-async function pdfToText(buffer: Buffer): Promise<String> {
+const MAX_RESUME_MB = 5;
+
+async function pdfToText(buffer: Buffer): Promise<string> {
   const pdf = await getDocumentProxy(new Uint8Array(buffer));
   const { text } = await extractText(pdf, { mergePages: true });
-  return text;
+  return text.trim();
 }
 
-app.post("/api/v1/pre-interview", upload.single("resume"), async (req, res) => {
+// Accepts "https://github.com/user", "github.com/user/" or just "user".
+function githubUsernameFrom(input: string): string | null {
+  const value = input.trim();
+  return (
+    value.match(/^(?:https?:\/\/)?(?:www\.)?github\.com\/([A-Za-z0-9-]{1,39})\/?$/i)?.[1] ??
+    value.match(/^[A-Za-z0-9-]{1,39}$/)?.[0] ??
+    null
+  );
+}
+
+// Runs multer and turns its errors (e.g. file too big) into a JSON 4xx
+// instead of Express's default HTML 500.
+const parseResumeUpload: express.RequestHandler = (req, res, next) => {
+  upload.single("resume")(req, res, (error: unknown) => {
+    if (error instanceof multer.MulterError) {
+      const tooBig = error.code === "LIMIT_FILE_SIZE";
+      res.status(tooBig ? 413 : 400).json({
+        message: tooBig ? `Resume must be ${MAX_RESUME_MB} MB or smaller.` : error.message,
+      });
+      return;
+    }
+    if (error) return next(error);
+    next();
+  });
+};
+
+// Needs a GitHub profile, a resume PDF, or both.
+app.post("/api/v1/pre-interview", parseResumeUpload, async (req, res) => {
   const { success, data } = preInterviewBody.safeParse(req.body);
   if (!success) {
-    res.status(411).json({
-      message: "bad body",
-    });
-    return;
+    return res.status(400).json({ message: "Invalid request." });
   }
 
-  const buffer = req.file?.buffer;
-  const resumeContent = await pdfToText(buffer!);
+  const githubInput = data.githubUrl?.trim() ?? "";
+  const resumeFile = req.file;
 
-  const githubUrl = data?.githubUrl.endsWith("/")
-    ? data?.githubUrl.slice(0, -1)
-    : data?.githubUrl;
+  if (!githubInput && !resumeFile) {
+    return res
+      .status(400)
+      .json({ message: "Add your GitHub profile, a resume, or both." });
+  }
 
-  const githubUsername = githubUrl?.split("/").pop();
+  // GitHub (optional)
+  let githubRepos: { name: string; description: string | null; fullName: string }[] = [];
+  if (githubInput) {
+    const username = githubUsernameFrom(githubInput);
+    if (!username) {
+      return res.status(400).json({
+        message: "That doesn't look like a GitHub profile link (github.com/your-name).",
+      });
+    }
+    try {
+      const response = await axios.get(
+        `https://api.github.com/users/${username}/repos`,
+        { params: { per_page: 100, sort: "updated" } },
+      );
+      githubRepos = response.data.map((repo: any) => ({
+        name: repo.name,
+        description: repo.description,
+        fullName: repo.full_name,
+      }));
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        return res
+          .status(400)
+          .json({ message: `GitHub user "${username}" was not found.` });
+      }
+      console.error("GitHub fetch failed:", error);
+      return res.status(502).json({
+        message: "Couldn't reach GitHub right now. Try again, or continue with just your resume.",
+      });
+    }
+  }
 
-  const userReposInfo = await axios.get(
-    `https://api.github.com/users/${githubUsername}/repos`,
-  );
-
-  // lets filter only what we need
-  const filteredUserRepo = userReposInfo.data.map((x: any) => ({
-    description: x.description,
-    name: x.name,
-    fullName: x.full_name,
-  }));
+  // Resume (optional)
+  let resumeData: string | null = null;
+  if (resumeFile) {
+    if (resumeFile.mimetype !== "application/pdf") {
+      return res.status(400).json({ message: "The resume must be a PDF." });
+    }
+    try {
+      resumeData = await pdfToText(resumeFile.buffer);
+    } catch (error) {
+      console.error("PDF parse failed:", error);
+      return res
+        .status(400)
+        .json({ message: "Couldn't read that PDF. Try exporting it again." });
+    }
+    if (!resumeData) {
+      return res.status(400).json({
+        message: "No text found in that PDF (is it a scanned image?). Upload a text-based PDF.",
+      });
+    }
+  }
 
   const interview = await prisma.interview.create({
     data: {
-      githubMetada: JSON.stringify(filteredUserRepo),
+      githubMetada: JSON.stringify(githubRepos),
       status: "Pre",
-      resumeData: resumeContent as string,
+      resumeData,
     },
   });
 
-  return res.json({
-    id: interview.id,
-  });
+  return res.json({ id: interview.id });
 });
 
 // by default it will read : GEMINI_API_KEY from the .env

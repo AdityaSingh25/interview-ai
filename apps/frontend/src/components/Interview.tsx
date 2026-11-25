@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { AudioLines, Headphones, LoaderCircle, Mic, MicOff, PhoneOff, Sparkles } from "lucide-react";
+import { Headphones, LoaderCircle, Mic, MicOff, PhoneOff } from "lucide-react";
 import { Backend_url } from "@/lib/config";
 import { cn } from "@/lib/utils";
-import { VoiceOrb } from "./VoiceOrb";
+import { useAudioLevel } from "@/lib/useAudioLevel";
+import { RingField, Wordmark } from "./Rings";
 
 type Phase = "idle" | "connecting" | "live" | "error";
 
@@ -51,6 +52,12 @@ export default function Interview() {
   const micRef = useRef<MediaStream | null>(null);
   const ctxRef = useRef<AudioContext | null>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+
+  // Live loudness for both voices, written straight to CSS (--level).
+  const aiRingsRef = useRef<HTMLDivElement>(null);
+  const micRingRef = useRef<HTMLDivElement>(null);
+  const aiSpeaking = useAudioLevel(aiRingsRef, aiStream, audioContext);
+  const youSpeaking = useAudioLevel(micRingRef, micStream, audioContext, muted);
 
   const teardown = useCallback(() => {
     pcRef.current?.close();
@@ -153,114 +160,152 @@ export default function Interview() {
 
   const inCall = phase === "connecting" || phase === "live";
 
+  let status = "";
+  if (phase === "connecting" || (phase === "live" && !aiStream)) status = "Connecting to Dante";
+  else if (phase === "live") {
+    if (aiSpeaking) status = "Dante is speaking";
+    else if (muted) status = "You're muted";
+    else if (youSpeaking) status = "Listening";
+    else status = "Your turn";
+  }
+
   return (
-    <div className="flex h-dvh flex-col overflow-hidden">
+    <div className="relative isolate flex h-dvh flex-col overflow-hidden px-5 sm:px-10">
       {/* Hidden player for the interviewer's voice. */}
       <audio ref={audioRef} autoPlay className="hidden" />
 
-      <header className="flex items-center justify-between px-4 py-4 sm:px-8">
-        <Link to="/" className="inline-flex items-center gap-2 text-sm font-medium">
-          <AudioLines className="size-4" />
-          AI Interview
-        </Link>
+      <header className="flex h-16 shrink-0 items-center justify-between sm:h-20">
+        <Wordmark />
         <StatusBadge phase={phase} elapsed={startedAt ? now - startedAt : 0} />
       </header>
 
-      <main className="grid flex-1 place-items-center px-4">
-        {phase === "idle" && (
-          <div className="flex max-w-sm flex-col items-center text-center">
-            <div className="mb-6 grid size-14 place-items-center rounded-full bg-ai/15 text-ai">
-              <Sparkles className="size-6" />
-            </div>
-            <h1 className="text-2xl font-semibold tracking-tight">Ready when you are</h1>
-            <p className="mt-2 text-sm text-pretty text-muted-foreground">
-              The interviewer will introduce itself and ask about your projects. Answer
-              out loud, like a real interview.
-            </p>
-            <p className="mt-4 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Headphones className="size-3.5" />
-              Use headphones so the AI doesn't hear itself.
-            </p>
-            <button
-              onClick={start}
-              className="mt-8 inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-primary px-6 text-sm font-medium text-primary-foreground shadow-xs transition-all hover:bg-primary/90 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none active:scale-[0.98]"
-            >
-              <Mic className="size-4" />
-              Start interview
-            </button>
-          </div>
-        )}
-
-        {inCall && (
-          <div className="flex flex-col items-center gap-10 sm:flex-row sm:gap-24">
-            <VoiceOrb
+      <main className="grid min-h-0 flex-1 place-items-center">
+        {inCall ? (
+          <div className="flex flex-col items-center">
+            <RingField
               tone="ai"
-              label="Interviewer"
-              icon={<Sparkles className="size-8" />}
-              stream={aiStream}
-              audioContext={audioContext}
-              statusOverride={phase === "connecting" || !aiStream ? "Joining…" : undefined}
+              rootRef={aiRingsRef}
+              mode={aiSpeaking ? "speaking" : "idle"}
+              className={cn(
+                "w-[min(78vw,52vh,30rem)] transition-opacity duration-700",
+                phase === "connecting" && "opacity-50",
+              )}
             />
-            <VoiceOrb
-              tone="user"
-              label="You"
-              icon={muted ? <MicOff className="size-8" /> : <Mic className="size-8" />}
-              stream={micStream}
-              audioContext={audioContext}
-              statusOverride={muted ? "Muted" : undefined}
-              silenced={muted}
-            />
+            <p
+              aria-live="polite"
+              className={cn(
+                "mt-4 text-2xl font-semibold tracking-tight transition-colors duration-300 sm:text-3xl",
+                phase !== "live" || !aiStream
+                  ? "text-muted-foreground"
+                  : aiSpeaking
+                    ? "text-ai"
+                    : youSpeaking && !muted
+                      ? "text-user"
+                      : "text-foreground",
+              )}
+            >
+              {status}
+            </p>
           </div>
-        )}
-
-        {phase === "error" && (
-          <div className="flex max-w-sm flex-col items-center text-center">
-            <h1 className="text-xl font-semibold tracking-tight">Couldn't start the interview</h1>
-            <p className="mt-2 text-sm text-pretty text-muted-foreground">{error}</p>
-            <div className="mt-6 flex gap-2">
-              <Link
-                to="/"
-                className="inline-flex h-10 items-center rounded-lg border px-4 text-sm font-medium transition-colors hover:bg-accent"
-              >
-                Back to home
-              </Link>
+        ) : phase === "error" ? (
+          <div className="max-w-md">
+            <h1 className="text-4xl font-bold tracking-[-0.03em] text-balance">
+              {alreadyStarted ? "This interview is already over." : "Dante couldn't start."}
+            </h1>
+            <p className="mt-3 leading-relaxed text-pretty text-muted-foreground">{error}</p>
+            <div className="mt-7 flex flex-wrap gap-2">
               {alreadyStarted ? (
                 <Link
                   to={`/result/${interviewId}`}
-                  className="inline-flex h-10 items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                  className="inline-flex h-12 items-center rounded-xl bg-primary px-6 font-semibold text-primary-foreground transition hover:brightness-110 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
                 >
-                  See results
+                  See your results
                 </Link>
               ) : (
                 <button
                   onClick={start}
-                  className="inline-flex h-10 items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                  className="inline-flex h-12 items-center rounded-xl bg-primary px-6 font-semibold text-primary-foreground transition hover:brightness-110 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none active:scale-[0.98]"
                 >
                   Try again
                 </button>
               )}
+              <Link
+                to="/"
+                className="inline-flex h-12 items-center rounded-xl border px-6 font-medium transition-colors hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+              >
+                Start a new interview
+              </Link>
             </div>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center text-center">
+            <RingField mode="intro" className="w-[min(70vw,40vh,22rem)]" />
+            <h1
+              className="rise-in mt-6 text-4xl font-bold tracking-[-0.03em] sm:text-5xl"
+              style={{ "--delay": "200ms" } as CSSProperties}
+            >
+              Ready when you are.
+            </h1>
+            <p
+              className="rise-in mt-3 max-w-sm leading-relaxed text-pretty text-muted-foreground"
+              style={{ "--delay": "300ms" } as CSSProperties}
+            >
+              Dante asks one question at a time about your work. Answer out loud,
+              the way you would in the room.
+            </p>
+            <button
+              onClick={start}
+              className="rise-in mt-7 inline-flex h-12 items-center gap-2 rounded-xl bg-primary px-7 font-semibold text-primary-foreground transition-[filter,transform] hover:brightness-110 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none active:scale-[0.98]"
+              style={{ "--delay": "400ms" } as CSSProperties}
+            >
+              <Mic className="size-4" />
+              Start interview
+            </button>
+            <p
+              className="rise-in mt-4 flex items-center gap-2 text-sm text-muted-foreground"
+              style={{ "--delay": "500ms" } as CSSProperties}
+            >
+              <Headphones className="size-4" />
+              Headphones keep Dante from hearing itself.
+            </p>
           </div>
         )}
       </main>
 
-      <footer className="flex h-24 items-center justify-center gap-3 pb-4">
+      <footer className="flex h-28 shrink-0 items-center justify-center gap-4 pb-4">
         {inCall && (
           <>
-            <button
-              onClick={toggleMute}
-              aria-pressed={muted}
-              aria-label={muted ? "Unmute microphone" : "Mute microphone"}
-              className={cn(
-                "grid size-12 place-items-center rounded-full border transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none",
-                muted ? "bg-foreground text-background" : "hover:bg-accent",
-              )}
+            {/* Your voice: a verdigris ring around the mic button grows as you talk. */}
+            <div
+              ref={micRingRef}
+              className="relative grid size-14 place-items-center"
+              style={{ "--level": 0 } as CSSProperties}
             >
-              {muted ? <MicOff className="size-5" /> : <Mic className="size-5" />}
-            </button>
+              <span
+                aria-hidden
+                className="level-scale absolute inset-0 rounded-full border-2 border-user"
+                style={{
+                  transform: "scale(calc(1 + var(--level) * 0.55))",
+                  opacity: "calc(0.15 + var(--level) * 0.85)",
+                }}
+              />
+              <button
+                onClick={toggleMute}
+                aria-pressed={muted}
+                aria-label={muted ? "Unmute microphone" : "Mute microphone"}
+                className={cn(
+                  "relative grid size-14 place-items-center rounded-full border transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none",
+                  muted
+                    ? "border-transparent bg-foreground text-background"
+                    : "bg-card text-user hover:bg-accent",
+                )}
+              >
+                {muted ? <MicOff className="size-5" /> : <Mic className="size-5" />}
+              </button>
+            </div>
             <button
               onClick={endInterview}
-              className="inline-flex h-12 items-center gap-2 rounded-full bg-destructive px-6 text-sm font-medium text-white transition-colors hover:bg-destructive/90 focus-visible:ring-[3px] focus-visible:ring-destructive/40 focus-visible:outline-none"
+              className="inline-flex h-14 items-center gap-2 rounded-full border border-destructive/50 px-6 font-medium text-destructive transition-colors hover:bg-destructive hover:text-background focus-visible:ring-[3px] focus-visible:ring-destructive/40 focus-visible:outline-none"
             >
               <PhoneOff className="size-4" />
               End interview
@@ -275,20 +320,21 @@ export default function Interview() {
 function StatusBadge({ phase, elapsed }: { phase: Phase; elapsed: number }) {
   if (phase === "connecting") {
     return (
-      <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-        <LoaderCircle className="size-3.5 animate-spin" />
+      <span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+        <LoaderCircle className="size-4 animate-spin" />
         Connecting
       </span>
     );
   }
   if (phase === "live") {
     return (
-      <span className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs tabular-nums">
+      <span className="inline-flex items-center gap-2 text-sm tabular-nums">
         <span className="relative flex size-2">
           <span className="absolute inline-flex size-full animate-ping rounded-full bg-destructive/60 motion-reduce:animate-none" />
           <span className="relative inline-flex size-2 rounded-full bg-destructive" />
         </span>
-        Live · {formatElapsed(elapsed)}
+        <span className="text-muted-foreground">Recording</span>
+        <span className="font-medium">{formatElapsed(elapsed)}</span>
       </span>
     );
   }
